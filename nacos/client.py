@@ -494,8 +494,6 @@ class NacosClient:
                 if isinstance(puller_info[0], Process):
                     puller_info[0].terminate()
 
-    def _do_sync_req_wrapper(self, **kwargs):
-        return self._do_sync_req(**kwargs)
 
     def _do_sync_req(self, url, headers=None, params=None, data=None, timeout=None, method="GET"):
         if self.username and self.password:
