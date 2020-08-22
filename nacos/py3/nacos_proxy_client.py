@@ -10,6 +10,8 @@
  
  Add New Functional nacos-sdk-python
 """
+from http import HTTPStatus
+from typing import Optional
 from urllib.error import HTTPError, URLError
 from ..client import NacosClient, logger
 from .nacos_base import NacosBaseRequest, RequestMethods
@@ -23,7 +25,7 @@ class NacosProxyClient(NacosClient):
     def tmp(self):
         pass
 
-    def _do_sync_req_proxy(self, request: NacosBaseRequest):
+    def _do_sync_req_proxy(self, request: NacosBaseRequest) -> Optional[str]:
         # public fields padding
         # 租户信息，对应 Nacos 的命名空间ID字段
         if not request.namespace:
@@ -43,13 +45,50 @@ class NacosProxyClient(NacosClient):
                                             data=data,
                                             timeout=timeout,
                                             method=method)
-            return response
-        except HTTPError as error:
-
+            return response.read().decode('utf-8')
+        except HTTPError as e:
+            if e.code == HTTPStatus.NOT_FOUND:
+                NOT_FOUND_TEMPLATE = \
+                    "[{tag}-{method_type}/{api_name}] {tag_name} not found for namespace:{namespace},params={payload}".format(
+                        tag=request.tag(),
+                        tag_name=request.tag(),
+                        method_type=request.request_method,
+                        api_name=request.request_api_name,
+                        namespace=request.namespace,
+                        payload=params
+                    )
+                # todo check snapshot
+                if request.tag() == 'CONFIGURATION':
+                    NOT_FOUND_TEMPLATE += ", try to delete snapshot"
+                logger.warning(NOT_FOUND_TEMPLATE)
+                # delete_file(self.snapshot_base, cache_key)
+                return None
+            elif e.code == HTTPStatus.CONFLICT:
+                CONFLICT_TEMPLATE = \
+                    "[{tag}-{method_type}/{api_name}] {tag_name} not found for namespace:{namespace},params={payload}".format(
+                        tag=request.tag(),
+                        tag_name=request.tag(),
+                        method_type=request.request_method,
+                        api_name=request.request_api_name,
+                        namespace=request.namespace,
+                        payload=params
+                    )
+                logger.error(
+                    "[get-config] config being modified concurrently for data_id:%s, group:%s, namespace:%s" % (
+                        data_id, group, self.namespace))
+            elif e.code == HTTPStatus.FORBIDDEN:
+                logger.error("[get-config] no right for data_id:%s, group:%s, namespace:%s" % (
+                    data_id, group, self.namespace))
+                raise NacosException("Insufficient privilege.")
+            else:
+                logger.error("[get-config] error code [:%s] for data_id:%s, group:%s, namespace:%s" % (
+                    e.code, data_id, group, self.namespace))
+                if no_snapshot:
+                    raise
             # todo snapshot handle
             pass
         except Exception as ex:
-            pass
+            raise ex
 
     def _do_pulling_proxy(self, ):
         pass

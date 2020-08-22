@@ -9,6 +9,7 @@
 """
 from abc import abstractmethod, ABC
 from enum import Enum
+from http import HTTPStatus
 from typing import Optional
 
 from nacos.exception import NacosRequestException
@@ -87,10 +88,14 @@ class NacosBaseRequest(object):
     def to_payload(self) -> JSON_TYPE:
         raise NacosRequestException('to_payload is abstract method,not implemented.')
 
+    @abstractmethod
+    def tag(self) -> str:
+        pass
+
 
 class NacosConfiguration(NacosBaseRequest, ABC):
-    #  do nothing for expand
-    pass
+    def tag(self) -> str:
+        return "CONFIGURATION"
 
 
 class NacosPostConfiguration(NacosConfiguration):
@@ -138,6 +143,39 @@ class NacosPostConfiguration(NacosConfiguration):
         return payload
 
 
+class NacosDeleteConfiguration(NacosConfiguration):
+    """
+    描述
+    删除 Nacos 上的配置。
+
+    请求类型
+    DELETE
+
+    请求 URL
+    /nacos/v1/cs/configs
+
+    请求参数
+    名称	类型	是否必须	描述
+    tenant	string	否	租户信息，对应 Naocs 的命名空间ID字段
+    dataId	string	是	配置 ID
+    group	string	是	配置分组
+    """
+
+    def __init__(self,
+                 data_id: str,
+                 group: str,
+                 tenant: Optional[str] = None, ):
+        super(NacosDeleteConfiguration, self).__init__(NACOS_CONFIG, RequestMethods.DELETE)
+        self._tenant = tenant
+        self._data_id = data_id
+        self._group = group
+
+    def to_payload(self) -> JSON_TYPE:
+        payload = {"dataId": self._data_id, "group": self._group,
+                   'tenant': self._tenant if self._tenant else self.namespace}
+        return payload
+
+
 class NacosGetConfiguration(NacosConfiguration):
     """
     描述
@@ -174,12 +212,13 @@ class NacosGetConfiguration(NacosConfiguration):
 # Nacos Service
 
 class NacosService(NacosBaseRequest, ABC):
-    pass
+    def tag(self) -> str:
+        return "SERVICE"
 
 
 # ResponseErrorCode
 
-class ResponseErrorCode(object):
+class NacosHTTPErrorCode(object):
     def __init__(self, code, desc, meaning):
         self._code = code
         self._desc = desc
@@ -188,3 +227,19 @@ class ResponseErrorCode(object):
     @property
     def code(self) -> int:
         return self._code
+
+    @property
+    def desc(self) -> str:
+        return self.desc
+
+    @property
+    def meaning(self) -> str:
+        return self._meaning
+
+
+class NacosErrorCodeEnum(Enum):
+    HTTPStatus.BAD_REQUEST = NacosHTTPErrorCode(400, "Bad Request", "客户端请求中的语法错误")
+    HTTPStatus.FORBIDDEN = NacosHTTPErrorCode(403, "Forbidden", "没有权限")
+    HTTPStatus.NOT_FOUND = NacosHTTPErrorCode(404, "Not Found", "无法找到资源")
+    HTTPStatus.INTERNAL_SERVER_ERROR = NacosHTTPErrorCode(500, "Internal Server Error", "服务器内部错误")
+    HTTPStatus.OK = NacosHTTPErrorCode(200, "OK", "正常")
