@@ -235,11 +235,3 @@ class NacosHTTPErrorCode(object):
     @property
     def meaning(self) -> str:
         return self._meaning
-
-
-class NacosErrorCodeEnum(Enum):
-    HTTPStatus.BAD_REQUEST = NacosHTTPErrorCode(400, "Bad Request", "客户端请求中的语法错误")
-    HTTPStatus.FORBIDDEN = NacosHTTPErrorCode(403, "Forbidden", "没有权限")
-    HTTPStatus.NOT_FOUND = NacosHTTPErrorCode(404, "Not Found", "无法找到资源")
-    HTTPStatus.INTERNAL_SERVER_ERROR = NacosHTTPErrorCode(500, "Internal Server Error", "服务器内部错误")
-    HTTPStatus.OK = NacosHTTPErrorCode(200, "OK", "正常")

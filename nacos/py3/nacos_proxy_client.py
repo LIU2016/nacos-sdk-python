@@ -12,9 +12,10 @@
 """
 from http import HTTPStatus
 from typing import Optional
-from urllib.error import HTTPError, URLError
-from ..client import NacosClient, logger
+from urllib.error import HTTPError
+
 from .nacos_base import NacosBaseRequest, RequestMethods
+from ..client import NacosClient, logger
 
 
 class NacosProxyClient(NacosClient):
@@ -25,7 +26,7 @@ class NacosProxyClient(NacosClient):
     def tmp(self):
         pass
 
-    def _do_sync_req_proxy(self, request: NacosBaseRequest) -> Optional[str]:
+    def _do_sync_req_proxy(self, request: NacosBaseRequest, exception_callback=None) -> Optional[str]:
         # public fields padding
         # 租户信息，对应 Nacos 的命名空间ID字段
         if not request.namespace:
@@ -47,48 +48,36 @@ class NacosProxyClient(NacosClient):
                                             method=method)
             return response.read().decode('utf-8')
         except HTTPError as e:
+            BASE_LOG_TEMPLATE = \
+                """
+                [{tag} {method_type} {api_name}] {message_detail} namespace:{namespace},params={payload}.{after_action}
+                """
             if e.code == HTTPStatus.NOT_FOUND:
-                NOT_FOUND_TEMPLATE = \
-                    "[{tag}-{method_type}/{api_name}] {tag_name} not found for namespace:{namespace},params={payload}".format(
-                        tag=request.tag(),
-                        tag_name=request.tag(),
-                        method_type=request.request_method,
-                        api_name=request.request_api_name,
-                        namespace=request.namespace,
-                        payload=params
-                    )
-                # todo check snapshot
-                if request.tag() == 'CONFIGURATION':
-                    NOT_FOUND_TEMPLATE += ", try to delete snapshot"
-                logger.warning(NOT_FOUND_TEMPLATE)
-                # delete_file(self.snapshot_base, cache_key)
-                return None
+                message_detail = "{tag} not found".format(tag=request.tag()),
             elif e.code == HTTPStatus.CONFLICT:
-                CONFLICT_TEMPLATE = \
-                    "[{tag}-{method_type}/{api_name}] {tag_name} not found for namespace:{namespace},params={payload}".format(
-                        tag=request.tag(),
-                        tag_name=request.tag(),
-                        method_type=request.request_method,
-                        api_name=request.request_api_name,
-                        namespace=request.namespace,
-                        payload=params
-                    )
-                logger.error(
-                    "[get-config] config being modified concurrently for data_id:%s, group:%s, namespace:%s" % (
-                        data_id, group, self.namespace))
+                message_detail = "{tag} config being modified concurrently for".format(tag=request.tag()),
             elif e.code == HTTPStatus.FORBIDDEN:
-                logger.error("[get-config] no right for data_id:%s, group:%s, namespace:%s" % (
-                    data_id, group, self.namespace))
-                raise NacosException("Insufficient privilege.")
+                message_detail = "{tag} no right for".format(tag=request.tag()),
+            elif e.code == HTTPStatus.INTERNAL_SERVER_ERROR:
+                message_detail = "{tag} internal server error for".format(tag=request.tag()),
             else:
-                logger.error("[get-config] error code [:%s] for data_id:%s, group:%s, namespace:%s" % (
-                    e.code, data_id, group, self.namespace))
-                if no_snapshot:
-                    raise
-            # todo snapshot handle
-            pass
+                message_detail = "{tag} {error} for".format(tag=request.tag(), error=e.code),
+            ERROR_TEMPLATE = BASE_LOG_TEMPLATE.format(
+                tag=request.tag(),
+                method_type=request.request_method,
+                api_name=request.request_api_name,
+                message_detail=message_detail,
+                namespace=request.namespace,
+                payload=params,
+                after_action=""
+            )
+            logger.error(ERROR_TEMPLATE)
+            raise e
         except Exception as ex:
             raise ex
+        finally:
+            exception_callback(request)
+            pass
 
     def _do_pulling_proxy(self, ):
         pass

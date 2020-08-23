@@ -12,6 +12,7 @@
 """
 import unittest
 import nacos
+from nacos.py3.nacos_listener import DefaultNacosListenerManager, LoggerListener, SnapshotListener
 
 SERVER_HOST = "localhost"
 SERVER_PORT = 8848
@@ -24,6 +25,14 @@ PASSWORD = None
 
 
 class TestClient(unittest.TestCase):
+    def test_nacos_listener(self):
+        nlm = DefaultNacosListenerManager()
+        ll = LoggerListener(LoggerListener.__name__)
+        sl = SnapshotListener(SnapshotListener.__name__)
+        nlm.add(ll).add(sl)
+        for i in nlm.all_listeners():
+            print()
+
     def test_nacos_server(self):
         nacos_server = nacos.NacosServer(SERVER_HOST, SERVER_PORT)
         self.assertEqual(SERVER_HOST, nacos_server.host)
@@ -51,6 +60,9 @@ class TestClient(unittest.TestCase):
             ))
         print(resp)
 
+    def _ex_callback(self, *args, **kwargs):
+        print("")
+
     def test_nacos_py3_get_configuration(self):
         client = nacos.NacosProxyClient(server_addresses=SERVER_URI,
                                         namespace=NAMESPACE,
@@ -62,5 +74,5 @@ class TestClient(unittest.TestCase):
             nacos.NacosGetConfiguration(
                 data_id="nacos-python-sdk-py31",
                 group="Py3Group"
-            ))
-        print(resp)
+            ), exception_callback=self._ex_callback)
+        print(resp + "==>")
