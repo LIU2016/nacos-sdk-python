@@ -14,7 +14,11 @@ from http import HTTPStatus
 from typing import Optional
 from urllib.error import HTTPError
 
-from .nacos_base import NacosBaseRequest, RequestMethods
+from .nacos_base import NacosBaseRequest, RequestMethods, NacosGetConfiguration
+from .nacos_listener \
+    import NacosInvokeListener, \
+    NacosInvokeListenerManager, \
+    DefaultNacosInvokeListenerManager, LoggerListener
 from ..client import NacosClient, logger
 
 
@@ -26,7 +30,24 @@ class NacosProxyClient(NacosClient):
     def tmp(self):
         pass
 
-    def _do_sync_req_proxy(self, request: NacosBaseRequest, exception_callback=None) -> Optional[str]:
+    # todo sample
+    def get_config(self,
+                   data_id: str,
+                   group: str,
+                   tenant: str = None,
+                   timeout: int = None,
+                   no_snapshot: bool = None):
+        # 在底层兼容
+        ngc = NacosGetConfiguration(data_id=data_id, group=group, tenant=tenant)
+        dnilm = DefaultNacosInvokeListenerManager()
+        dnilm.add(LoggerListener(listener_name=LoggerListener.__name__))
+
+        self._do_sync_req_proxy(request=ngc, nacos_invoke_listener_manager=dnilm)
+
+        pass
+
+    def _do_sync_req_proxy(self, request: NacosBaseRequest,
+                           nacos_invoke_listener_manager: NacosInvokeListenerManager = None) -> Optional[str]:
         # public fields padding
         # 租户信息，对应 Nacos 的命名空间ID字段
         if not request.namespace:
@@ -38,6 +59,8 @@ class NacosProxyClient(NacosClient):
         timeout = request.request_timeout if request.request_timeout is not None else 1000
         method = request.request_method.value if request.request_method is not None else RequestMethods.GET
 
+        # do before execute listener
+        # self._do_before_invoke_listeners(request,)
         # invoker
         try:
             response = super()._do_sync_req(url=uri,
@@ -46,7 +69,10 @@ class NacosProxyClient(NacosClient):
                                             data=data,
                                             timeout=timeout,
                                             method=method)
-            return response.read().decode('utf-8')
+            response_text = response.read().decode('utf-8')
+            # before execute listener
+            # self._do_after_invoke_listeners(request,)
+
         except HTTPError as e:
             BASE_LOG_TEMPLATE = \
                 """
@@ -76,8 +102,41 @@ class NacosProxyClient(NacosClient):
         except Exception as ex:
             raise ex
         finally:
-            exception_callback(request)
             pass
 
+    def _do_before_invoke_listeners(self,
+                                    request: NacosBaseRequest,
+                                    nacos_invoke_listener_manager: NacosInvokeListenerManager):
+        """
+        调用前监听
+        :param request:
+        :param nacos_invoke_listener_manager:
+        :return:
+        """
+        for name, listener in nacos_invoke_listener_manager.all_listeners().items():
+            #  logListener
+            if isinstance(listener, LoggerListener) and self.debug:
+                listener.before_invoke(request)
+                return
+
+    def _do_after_invoke_listeners(self,
+                                   request: NacosBaseRequest,
+                                   nacos_invoke_listener_manager: NacosInvokeListenerManager):
+        """
+        调用后监听
+        :param request:
+        :param nacos_invoke_listener_manager:
+        :return:
+        """
+        for name, listener in nacos_invoke_listener_manager.all_listeners().items():
+            #  logListener
+            if isinstance(listener, LoggerListener) and self.debug:
+                listener.before_invoke(request)
+                return
+
     def _do_pulling_proxy(self, ):
+        """
+        长轮询代理请求
+        :return:
+        """
         pass

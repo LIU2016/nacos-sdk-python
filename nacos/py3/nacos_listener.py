@@ -11,12 +11,12 @@
  Add New Functional nacos-sdk-python
 """
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .nacos_base import NacosBaseRequest
 
 
-class NacosListener(object):
+class NacosInvokeListener(object):
     def __init__(self, listener_name):
         self._listener_name = listener_name
 
@@ -24,7 +24,7 @@ class NacosListener(object):
     def listener_name(self) -> str:
         return self._listener_name
 
-    def before_invoke(self, request: NacosBaseRequest):
+    def before_invoke(self, request: NacosBaseRequest) -> Optional[Any]:
         pass
 
     def after_invoke(self, response: dict):
@@ -36,13 +36,13 @@ class NacosListener(object):
     # ....
 
 
-class NacosListenerManager(object):
+class NacosInvokeListenerManager(object):
     @abstractmethod
-    def all_listeners(self) -> dict:
+    def all_listeners(self) -> Dict[str, NacosInvokeListener]:
         pass
 
     @abstractmethod
-    def add(self, nl: NacosListener):
+    def add(self, nl: NacosInvokeListener):
         pass
 
     @abstractmethod
@@ -57,14 +57,15 @@ class NacosListenerManager(object):
         self.all_listeners().__iter__()
 
 
-class DefaultNacosListenerManager(NacosListenerManager):
+# 默认监听管理
+class DefaultNacosInvokeListenerManager(NacosInvokeListenerManager):
     def __init__(self):
         self._nacos_manager_dict = {}
 
-    def all_listeners(self) -> dict:
+    def all_listeners(self) -> Dict[str, NacosInvokeListener]:
         return self._nacos_manager_dict
 
-    def add(self, nl: NacosListener):
+    def add(self, nl: NacosInvokeListener):
         self._nacos_manager_dict[nl.listener_name] = nl
         return self
 
@@ -72,11 +73,11 @@ class DefaultNacosListenerManager(NacosListenerManager):
         self._nacos_manager_dict.pop(nl_name)
         return self
 
-    def select(self, nl_name: str) -> Optional[NacosListener]:
+    def select(self, nl_name: str) -> Optional[NacosInvokeListener]:
         return self._nacos_manager_dict[nl_name]
 
 
-class LoggerListener(NacosListener):
+class LoggerListener(NacosInvokeListener):
     def before_invoke(self, request: NacosBaseRequest):
         print("before invoke")
 
@@ -87,7 +88,7 @@ class LoggerListener(NacosListener):
         print(exception)
 
 
-class SnapshotListener(NacosListener):
+class SnapshotListener(NacosInvokeListener):
     def before_invoke(self, request: NacosBaseRequest):
         print("SnapshotListener before invoke")
 

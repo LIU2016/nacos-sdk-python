@@ -9,7 +9,6 @@
 """
 from abc import abstractmethod, ABC
 from enum import Enum
-from http import HTTPStatus
 from typing import Optional
 
 from nacos.exception import NacosRequestException

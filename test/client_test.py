@@ -1,6 +1,8 @@
 # -*- coding: utf8 -*-
 
 from __future__ import print_function
+
+import sys
 import unittest
 import nacos
 from nacos import files
@@ -190,6 +192,24 @@ class TestClient(unittest.TestCase):
             client.send_heartbeat("test.service", "1.0.0.1", 8080, "testCluster2", 0.1, {"a":"c"})["clientBeatInterval"] > 0,
             True)
 
+    def test_add_instance(self):
+        import nacos
+        import time
+        SERVER_HOST = "localhost"
 
+        SERVER_PORT = 8848
+        SERVER_URI = SERVER_HOST + ":" + str(SERVER_PORT)
+        NAMESPACE = ""
+        client = nacos.NacosClient(server_addresses=SERVER_URI,
+                                        namespace=NAMESPACE,
+                                        username=USERNAME,
+                                        password=PASSWORD)
+
+        result = client.add_naming_instance(service_name="nacos-self-service", ip='220.181.38.148', port=80,
+                                            cluster_name="nacos-py-cluster-name")
+
+        print(result)
+        # block action
+        time.sleep(1000)
 if __name__ == '__main__':
     unittest.main()
