@@ -696,6 +696,14 @@ class NacosClient:
         except Exception as e:
             logger.exception("[add-naming-instance] exception %s occur" % str(e))
             raise
+        finally:
+            def on_result(res):
+                print(res)
+
+            from .py3.nacos_timer import NacosTimer
+            nacos_timer = NacosTimer("add_naming_install_timer",self.send_heartbeat,7,service_name,ip,port)
+            nacos_timer.set_on_result(on_result)
+            nacos_timer.scheduler()
 
     def remove_naming_instance(self, service_name, ip, port, cluster_name=None, ephemeral=True):
         logger.info("[remove-naming-instance] ip:%s, port:%s, service_name:%s, namespace:%s" % (

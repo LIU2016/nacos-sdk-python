@@ -4,3 +4,4 @@
 
 3. client http 调用异步化 API 支持。
 
+4. 新增 nacos_timer 定时任务调度
