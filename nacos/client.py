@@ -18,13 +18,13 @@ from threading import RLock, Thread
 try:
     # python3.6
     from http import HTTPStatus
-    from urllib.request import Request, urlopen
+    from urllib.request import Request, urlopen, ProxyHandler, build_opener, install_opener
     from urllib.parse import urlencode, unquote_plus, quote
     from urllib.error import HTTPError, URLError
 except ImportError:
     # python2.7
     import httplib as HTTPStatus
-    from urllib2 import Request, urlopen, HTTPError, URLError
+    from urllib2 import Request, urlopen, HTTPError, URLError, ProxyHandler, build_opener, install_opener
     from urllib import urlencode, unquote_plus, quote
 
     base64.encodebytes = base64.encodestring
@@ -40,7 +40,7 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 DEBUG = False
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 DEFAULT_GROUP_NAME = "DEFAULT_GROUP"
 DEFAULT_NAMESPACE = ""
@@ -59,7 +59,7 @@ DEFAULTS = {
 }
 
 OPTIONS = {"default_timeout", "pulling_timeout", "pulling_config_size", "callback_thread_num", "failover_base",
-           "snapshot_base", "no_snapshot"}
+           "snapshot_base", "no_snapshot", "proxies"}
 
 
 def process_common_config_params(data_id, group):
@@ -268,6 +268,7 @@ class NacosClient:
         self.failover_base = DEFAULTS["FAILOVER_BASE"]
         self.snapshot_base = DEFAULTS["SNAPSHOT_BASE"]
         self.no_snapshot = False
+        self.proxies = None
 
         logger.info("[client-init] endpoint:%s, tenant:%s" % (endpoint, namespace))
 
@@ -623,6 +624,11 @@ class NacosClient:
                 else:
                     req = Request(url=server_url + url, data=urlencode(data).encode() if data else None,
                                   headers=all_headers, method=method)
+                # build a new opener that adds proxy setting so that http request go through the proxy
+                if self.proxies:
+                    proxy_support = ProxyHandler(self.proxies)
+                    opener = build_opener(proxy_support)
+                    install_opener(opener)
 
                 # for python version compatibility
                 if python_version_bellow("2.7.9"):
@@ -761,8 +767,9 @@ class NacosClient:
             else:
                 params["metadata"] = metadata
 
+
     def add_naming_instance(self, service_name, ip, port, cluster_name=None, weight=1.0, metadata=None,
-                            enable=True, healthy=True, ephemeral=True):
+                            enable=True, healthy=True, ephemeral=True,group_name=DEFAULT_GROUP_NAME):
         logger.info("[add-naming-instance] ip:%s, port:%s, service_name:%s, namespace:%s" % (
             ip, port, service_name, self.namespace))
 
@@ -774,7 +781,8 @@ class NacosClient:
             "enable": enable,
             "healthy": healthy,
             "clusterName": cluster_name,
-            "ephemeral": ephemeral
+            "ephemeral": ephemeral,
+            "groupName": group_name
         }
         self._build_metadata(metadata, params)
 
@@ -796,7 +804,7 @@ class NacosClient:
             logger.exception("[add-naming-instance] exception %s occur" % str(e))
             raise
 
-    def remove_naming_instance(self, service_name, ip, port, cluster_name=None, ephemeral=True):
+    def remove_naming_instance(self, service_name, ip, port, cluster_name=None, ephemeral=True,group_name=DEFAULT_GROUP_NAME):
         logger.info("[remove-naming-instance] ip:%s, port:%s, service_name:%s, namespace:%s" % (
             ip, port, service_name, self.namespace))
 
@@ -804,7 +812,8 @@ class NacosClient:
             "ip": ip,
             "port": port,
             "serviceName": service_name,
-            "ephemeral": ephemeral
+            "ephemeral": ephemeral,
+            "groupName":group_name
         }
 
         if cluster_name is not None:
@@ -829,7 +838,7 @@ class NacosClient:
             raise
 
     def modify_naming_instance(self, service_name, ip, port, cluster_name=None, weight=None, metadata=None,
-                               enable=None, ephemeral=True):
+                               enable=None, ephemeral=True,group_name=DEFAULT_GROUP_NAME):
         logger.info("[modify-naming-instance] ip:%s, port:%s, service_name:%s, namespace:%s" % (
             ip, port, service_name, self.namespace))
 
@@ -837,7 +846,8 @@ class NacosClient:
             "ip": ip,
             "port": port,
             "serviceName": service_name,
-            "ephemeral": ephemeral
+            "ephemeral": ephemeral,
+            "groupName": group_name
         }
 
         if cluster_name is not None:
@@ -942,7 +952,7 @@ class NacosClient:
             logger.exception("[get-naming-instance] exception %s occur" % str(e))
             raise
 
-    def send_heartbeat(self, service_name, ip, port, cluster_name=None, weight=1.0, metadata=None, ephemeral=True):
+    def send_heartbeat(self, service_name, ip, port, cluster_name=None, weight=1.0, metadata=None, ephemeral=True,group_name=DEFAULT_GROUP_NAME):
         logger.info("[send-heartbeat] ip:%s, port:%s, service_name:%s, namespace:%s" % (ip, port, service_name,
                                                                                         self.namespace))
         beat_data = {
@@ -951,6 +961,7 @@ class NacosClient:
             "port": port,
             "weight": weight,
             "ephemeral": ephemeral
+
         }
 
         if cluster_name is not None:
@@ -965,6 +976,7 @@ class NacosClient:
         params = {
             "serviceName": service_name,
             "beat": json.dumps(beat_data),
+            "groupName": group_name
         }
 
         if self.namespace:
