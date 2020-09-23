@@ -23,6 +23,7 @@ PASSWORD = None
 
 client = nacos.NacosClient(SERVER_ADDRESSES, namespace=NAMESPACE, username=USERNAME, password=PASSWORD)
 
+
 class TestClient(unittest.TestCase):
     def test_get_server(self):
         self.assertEqual(client.get_server(), (SERVER_1, 8848))
@@ -151,11 +152,6 @@ class TestClient(unittest.TestCase):
         shutil.rmtree(client2.snapshot_base)
 
     def test_add_naming_instance(self):
-        self.assertEqual(
-            client.add_naming_instance("test.service1", "1.0.0.7", 8080, "testCluster2", 0.2, "{}", False, True), True)
-
-    def test_add_naming_instance_with_proxy(self):
-        client.proxies = {"http":"http://127.0.0.1:38080"}
         self.assertEqual(
             client.add_naming_instance("test.service1", "1.0.0.7", 8080, "testCluster2", 0.2, "{}", False, True), True)
 
